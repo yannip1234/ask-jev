@@ -1,0 +1,2 @@
+# MCP's official Python SDK; the standalone CLI has no Python dependencies.
+mcp==2.2.0
