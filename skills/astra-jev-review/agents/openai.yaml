@@ -1,0 +1,6 @@
+interface:
+  display_name: "Astra Jev Review"
+  short_description: "Check Astra's work with Jev as it happens"
+  default_prompt: "Use $astra-jev-review throughout this task to check your interpretations, decisions, changes, and results with the AskJev CLI as you work."
+policy:
+  allow_implicit_invocation: true

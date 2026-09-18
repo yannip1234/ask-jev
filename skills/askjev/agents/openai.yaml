@@ -1,0 +1,4 @@
+interface:
+  display_name: "AskJev"
+  short_description: "Ask Jev directly through the TypeSafe API"
+  default_prompt: "Use $askjev to ask Jev about my question and report its typed judgment and probabilities."

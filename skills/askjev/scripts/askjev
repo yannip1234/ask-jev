@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Ask TypeSafe's Jev using curl; Python only prepares and reads JSON."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+def read_text(path):
+    return sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+
+
+def validate(payload):
+    if not isinstance(payload, dict):
+        raise ValueError("request must be a JSON object")
+    if not isinstance(payload.get("state"), (str, dict, list)):
+        raise ValueError("state must be text, an object, or an array")
+    if not isinstance(payload.get("model"), str) or not payload["model"]:
+        raise ValueError("model must be a nonempty string")
+    questions = payload.get("questions")
+    if not isinstance(questions, dict) or not questions:
+        raise ValueError("questions must be a nonempty object")
+    for key, question in questions.items():
+        if not isinstance(question, dict):
+            raise ValueError(f"question {key!r} must be an object")
+        kind = question.get("type")
+        if kind not in ("noul", "choice", "score"):
+            raise ValueError(f"question {key!r}: unknown type")
+        if not isinstance(question.get("instructions"), (str, dict, list)):
+            raise ValueError(f"question {key!r}: instructions are required")
+        criteria = question.get("criteria")
+        if kind == "choice" and (not isinstance(criteria, dict) or not criteria):
+            raise ValueError(f"question {key!r}: choice needs an options object")
+        if kind == "score" and (not isinstance(criteria, list) or len(criteria) < 2):
+            raise ValueError(f"question {key!r}: score needs at least two levels")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--state", help="State as text")
+    source.add_argument("--state-file", help="UTF-8 state file, or - for stdin")
+    source.add_argument("--request", help="Full JSON request file, or - for stdin")
+    parser.add_argument("--state-json", action="store_true", help="Parse state as JSON")
+    parser.add_argument("--question", help="Question instructions (required except with --request)")
+    parser.add_argument("--type", choices=("noul", "choice", "score"), default=None)
+    parser.add_argument("--criteria", help="JSON choice options, score levels, or noul criteria")
+    parser.add_argument("--model", help="Model override (default: jev-latest)")
+    parser.add_argument("--dry-run", action="store_true", help="Print payload without calling API")
+    args = parser.parse_args()
+    try:
+        if args.request is not None:
+            if args.question is not None or args.type is not None or args.criteria is not None or args.state_json:
+                parser.error("--request cannot be combined with question or state modifiers")
+            payload = json.loads(read_text(args.request))
+            if not isinstance(payload, dict):
+                raise ValueError("request must be a JSON object")
+            payload["model"] = args.model or payload.get("model", "jev-latest")
+        else:
+            if not args.question:
+                parser.error("--question is required")
+            state = args.state if args.state is not None else read_text(args.state_file)
+            question = {"type": args.type or "noul", "instructions": args.question}
+            if args.criteria is not None:
+                question["criteria"] = json.loads(args.criteria)
+            payload = {"state": json.loads(state) if args.state_json else state,
+                       "model": args.model or "jev-latest", "questions": {"answer": question}}
+        validate(payload)
+        body = json.dumps(payload, ensure_ascii=False, allow_nan=False)
+        if args.dry_run:
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        secret = os.environ.get("TYPESAFE_API_KEY", "")
+        if not secret:
+            raise ValueError("Set TYPESAFE_API_KEY in your local environment before calling Jev")
+        if any(character in secret for character in "\r\n\x00"):
+            raise ValueError("TYPESAFE_API_KEY contains invalid characters")
+        curl = shutil.which("curl")
+        if not curl:
+            raise ValueError("curl is required but was not found on PATH")
+        # A private header file keeps the key out of process arguments and output.
+        with tempfile.TemporaryDirectory(prefix="askjev-") as directory:
+            headers = Path(directory) / "headers"
+            headers.write_text("Authorization: Bearer " + secret + "\nContent-Type: application/json\n", encoding="utf-8")
+            headers.chmod(0o600)
+            response = Path(directory) / "response"
+            result = subprocess.run(
+                [curl, "--disable", "--silent", "--show-error", "--connect-timeout", "15",
+                 "--max-time", "120", "--request", "POST", "--header", "@" + str(headers),
+                 "--data-binary", "@-", "--output", str(response), "--write-out", "%{http_code}",
+                 "https://api.typesafe.ai/v1/systemone"],
+                input=body, text=True, encoding="utf-8", capture_output=True, timeout=125)
+            if result.returncode:
+                raise ValueError("curl failed: " + result.stderr.strip().replace(secret, "[redacted]"))
+            response_text = response.read_text(encoding="utf-8")
+            if not result.stdout.startswith("2"):
+                raise ValueError(f"HTTP {result.stdout}: " + response_text.replace(secret, "[redacted]"))
+            answer = json.loads(response_text)
+            if not isinstance(answer, dict) or not isinstance(answer.get("answers"), dict):
+                raise ValueError("API returned JSON without an answers object")
+            for key, question in payload["questions"].items():
+                item = answer["answers"].get(key)
+                if not isinstance(item, dict) or item.get("type") != question["type"] or question["type"] not in item:
+                    raise ValueError(f"API returned a missing or malformed answer for {key!r}")
+            print(json.dumps(answer, ensure_ascii=False, indent=2))
+            return 0
+    except (ValueError, OSError, subprocess.TimeoutExpired) as error:
+        print(f"askjev: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
