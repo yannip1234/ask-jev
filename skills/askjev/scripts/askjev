@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -12,6 +13,36 @@ import tempfile
 
 def read_text(path):
     return sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+
+
+def api_key(env_file=None):
+    """Read only the API key; never execute or interpolate dotenv contents."""
+    secret = os.environ.get("TYPESAFE_API_KEY", "")
+    if secret:
+        return secret
+    path = Path(env_file).expanduser() if env_file is not None else Path.cwd() / ".env"
+    try:
+        contents = path.read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        if env_file is not None:
+            raise ValueError("The specified --env-file does not exist") from None
+        return ""
+    secret = ""
+    for number, line in enumerate(contents.splitlines(), 1):
+        match = re.match(r"^\s*(?:export\s+)?TYPESAFE_API_KEY\s*=(.*)$", line)
+        if not match:
+            continue
+        value = match.group(1).strip()
+        if value.startswith(("'", '"')):
+            closing = value.find(value[0], 1)
+            if closing < 0 or (value[closing + 1:].strip() and
+                               not value[closing + 1:].strip().startswith("#")):
+                raise ValueError(f"Invalid TYPESAFE_API_KEY quoting on dotenv line {number}")
+            secret = value[1:closing]
+        else:
+            # A comment starts at # only at the start or after whitespace.
+            secret = re.split(r"(?:^|\s)#", value, maxsplit=1)[0].rstrip()
+    return secret
 
 
 def validate(payload):
@@ -50,6 +81,7 @@ def main():
     parser.add_argument("--type", choices=("noul", "choice", "score"), default=None)
     parser.add_argument("--criteria", help="JSON choice options, score levels, or noul criteria")
     parser.add_argument("--model", help="Model override (default: jev-latest)")
+    parser.add_argument("--env-file", help="API key file (default: .env in the working directory; environment wins)")
     parser.add_argument("--dry-run", action="store_true", help="Print payload without calling API")
     args = parser.parse_args()
     try:
@@ -74,9 +106,9 @@ def main():
         if args.dry_run:
             print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 0
-        secret = os.environ.get("TYPESAFE_API_KEY", "")
+        secret = api_key(args.env_file)
         if not secret:
-            raise ValueError("Set TYPESAFE_API_KEY in your local environment before calling Jev")
+            raise ValueError("Set TYPESAFE_API_KEY in your environment, .env, or --env-file before calling Jev")
         if any(character in secret for character in "\r\n\x00"):
             raise ValueError("TYPESAFE_API_KEY contains invalid characters")
         curl = shutil.which("curl")

@@ -33,7 +33,15 @@ print('Installed both skills in', destination)
 PYINSTALL
 ```
 
-Configure `TYPESAFE_API_KEY` locally in the environment used by the agent. Keep it out of repository files and chat. AskJev reads the installed `typesafe-ai` skill or its public upstream instructions, then checks current TypeSafe documentation; a third skill does not need to be copied into this repository.
+Configure `TYPESAFE_API_KEY` in the environment used by the agent, or put this in a local `.env` file in the directory where you run AskJev:
+
+```dotenv
+TYPESAFE_API_KEY='your-key-here'
+```
+
+A nonempty environment variable wins over the file. To use a shared key file from any task directory, pass `--env-file /absolute/path/to/.env`. The CLI reads only `TYPESAFE_API_KEY`, without sourcing shell code or expanding variables. It supports single-line unquoted or quoted values, optional `export`, and comments. It does not search parent directories. Dry runs do not read key files.
+
+Keep real key files out of Git and chat; this repository ignores `.env` and `.env.*`. AskJev reads the installed `typesafe-ai` skill or its public upstream instructions, then checks current TypeSafe documentation; a third skill does not need to be copied into this repository.
 
 ## Use
 
@@ -59,7 +67,14 @@ python3 skills/askjev/scripts/askjev \
   --dry-run
 ```
 
-Remove `--dry-run` to call TypeSafe. Requests send the selected state and questions to `https://api.typesafe.ai/v1/systemone` and may incur API usage charges. The CLI can be run by its installed absolute path; putting it on PATH is optional.
+To use a specific dotenv file:
+
+```sh
+python3 skills/askjev/scripts/askjev --env-file /absolute/path/to/.env \
+  --state 'Hello' --question 'Is this a greeting?'
+```
+
+Remove `--dry-run` from the earlier example to call TypeSafe. Requests send the selected state and questions to `https://api.typesafe.ai/v1/systemone` and may incur API usage charges. The CLI can be run by its installed absolute path; putting it on PATH is optional.
 
 A missing key or API failure is reported accurately while useful local work continues. Jev supplements evidence and verification. It does not authorize actions or replace executable tests. Keep requests and responses from your own work outside the public repository.
 

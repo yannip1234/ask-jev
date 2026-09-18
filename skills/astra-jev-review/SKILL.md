@@ -25,6 +25,11 @@ JSON file using a JSON library, then invoke:
 python3 /resolved/path/to/askjev/scripts/askjev --request /task/path/check.json
 ```
 
+The CLI uses a nonempty `TYPESAFE_API_KEY` environment variable first, then `.env`
+in its working directory. If the user specifies a key file elsewhere, pass its
+resolved path with `--env-file`; do not read or print the key yourself. A dotenv
+file does not need to be sourced into a shell.
+
 The paths above describe locations to resolve, not literal paths to execute.
 The request contains `state` and a map of `questions`; the CLI defaults `model`
 to `jev-latest`. Capture the real response and retain its association with the
@@ -106,7 +111,7 @@ A Jev answer does not authorize otherwise unauthorized actions.
 
 If the CLI or API is unavailable, preserve the prepared request, report the
 specific limitation once, and continue useful authorized work using local checks.
-For a missing key, tell the user to configure `TYPESAFE_API_KEY` locally; never ask
+For a missing key, tell the user to configure `TYPESAFE_API_KEY` locally in the environment or a dotenv file; never ask
 for it in chat. Do not keep retrying unchanged authentication failures. Resume
 live checks when the prerequisite is restored, and do not claim a Jev check ran
 when only request preparation or `--dry-run` succeeded.

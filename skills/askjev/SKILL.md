@@ -13,9 +13,28 @@ cannot read it. Reuse documentation already read in the current task.
 
 Actually consult Jev when invoked; do not merely write an example request.
 The bundled CLI uses curl directly, without an SDK. It needs Python 3, curl,
-and `TYPESAFE_API_KEY` in the environment. If the key is missing, prepare the
-request and tell the user to configure the variable locally; do not ask them to
+and `TYPESAFE_API_KEY` in the environment or a local dotenv file. If the key is
+missing, prepare the request and tell the user to configure it locally; do not ask them to
 paste a secret into chat or claim an API result.
+
+## Configure the API key
+
+A nonempty `TYPESAFE_API_KEY` environment variable takes precedence. Otherwise,
+the CLI reads `.env` in its current working directory, or the file selected by
+`--env-file /absolute/path/to/.env`. It does not search parent directories or the
+skill directory. Use `--env-file` for a shared key file when working across tasks.
+
+```dotenv
+TYPESAFE_API_KEY='your-key-here'
+```
+
+Only `TYPESAFE_API_KEY` is read; other entries are ignored. Values may be unquoted,
+single-quoted, or double-quoted on one line, with optional `export` and comments.
+Values are literal: no variable expansion, escape processing, shell commands, or
+multiline values. For duplicate key entries the last one wins. A missing default
+`.env` is ignored; an explicitly selected missing file is an error when needed.
+Keep real key files out of version control. Never print their contents.
+`--dry-run` neither reads dotenv files nor requires a key.
 
 ## Prepare the judgment
 
@@ -51,6 +70,8 @@ askjev --state-file ticket.txt --question 'How frustrated is the customer?' \
   --type score --criteria '["Calm","Frustrated but civil","Very angry"]'
 
 askjev --request request.json
+
+askjev --env-file /absolute/path/to/.env --request request.json
 ```
 
 `--state-file -` reads text from stdin; `--state-json` interprets state as JSON.
