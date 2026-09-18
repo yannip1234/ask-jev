@@ -1,0 +1,9 @@
+# Allow only the files required to build the server. No .env or Git history.
+**
+!Dockerfile
+!requirements-mcp.txt
+!askjev_mcp.py
+!skills/
+!skills/askjev/
+!skills/askjev/scripts/
+!skills/askjev/scripts/askjev

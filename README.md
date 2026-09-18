@@ -1,4 +1,4 @@
-# Astra Jev Review + AskJev
+# Ask Jev
 
 Two skills for using the AskJev CLI continuously while Astra works:
 
@@ -7,6 +7,19 @@ Two skills for using the AskJev CLI continuously while Astra works:
 
 The workflow checks meaningful units of work throughout a task. Astra supplies evidence, inspects Jev's actual judgments, investigates concerns, and continues working. It batches related checks and avoids repeatedly asking for approval on unchanged evidence.
 
+## Docker MCP server
+
+Run AskJev as a stdio MCP tool in Docker. Build the image, then let your MCP
+client launch it with an environment variable or a read-only dotenv mount:
+
+```sh
+docker build -t askjev-mcp:local .
+docker run --rm -i -e TYPESAFE_API_KEY askjev-mcp:local
+```
+
+See [Docker and MCP setup](docs/mcp.md) for dotenv mounts, client configuration,
+tool arguments, and tests. The MCP server wraps the same CLI used by the skills.
+
 ## Install
 
 Requires Git, Python 3, curl, and a TypeSafe API key. The CLI needs no Python packages or SDK.
@@ -14,8 +27,8 @@ Requires Git, Python 3, curl, and a TypeSafe API key. The CLI needs no Python pa
 Clone this repository and copy both skills into your Codex skills directory. These commands stop if either skill already exists so an existing installation can be inspected before updating it:
 
 ```sh
-git clone https://github.com/yannip1234/astra-jev-review.git
-cd astra-jev-review
+git clone https://github.com/yannip1234/ask-jev.git
+cd ask-jev
 python3 - <<'PYINSTALL'
 import os
 from pathlib import Path
