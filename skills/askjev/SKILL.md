@@ -20,9 +20,13 @@ paste a secret into chat or claim an API result.
 ## Configure the API key
 
 A nonempty `TYPESAFE_API_KEY` environment variable takes precedence. Otherwise,
-the CLI reads `.env` in its current working directory, or the file selected by
-`--env-file /absolute/path/to/.env`. It does not search parent directories or the
-skill directory. Use `--env-file` for a shared key file when working across tasks.
+the CLI searches `.env` in the current working directory and each parent up to
+the filesystem root, followed by the resolved script directory and its parents.
+The first file with a nonempty key wins; repeated paths are checked once. This
+lets an installed skill use a `.env` in its skill directory from any task.
+`--env-file /absolute/path/to/.env` selects only that file and disables searching;
+an empty or missing explicit file never falls back to another file.
+Malformed key entries or unreadable files report an error rather than falling back.
 
 ```dotenv
 TYPESAFE_API_KEY='your-key-here'

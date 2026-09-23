@@ -15,18 +15,38 @@ def read_text(path):
     return sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
 
 
+def dotenv_paths():
+    """Search working-directory ancestors, then resolved installation ancestors."""
+    roots = (Path.cwd().resolve(), Path(__file__).resolve().parent)
+    return tuple(dict.fromkeys(
+        directory / ".env"
+        for root in roots
+        for directory in (root, *root.parents)
+    ))
+
+
 def api_key(env_file=None):
     """Read only the API key; never execute or interpolate dotenv contents."""
     secret = os.environ.get("TYPESAFE_API_KEY", "")
     if secret:
         return secret
-    path = Path(env_file).expanduser() if env_file is not None else Path.cwd() / ".env"
-    try:
-        contents = path.read_text(encoding="utf-8-sig")
-    except FileNotFoundError:
-        if env_file is not None:
-            raise ValueError("The specified --env-file does not exist") from None
-        return ""
+    explicit = env_file is not None
+    paths = (Path(env_file).expanduser(),) if explicit else dotenv_paths()
+    for path in paths:
+        try:
+            contents = path.read_text(encoding="utf-8-sig")
+        except FileNotFoundError:
+            if explicit:
+                raise ValueError("The specified --env-file does not exist") from None
+            continue
+        secret = parse_api_key(contents)
+        if secret:
+            return secret
+    return ""
+
+
+def parse_api_key(contents):
+    """Parse one dotenv file literally, ignoring unrelated variables."""
     secret = ""
     for number, line in enumerate(contents.splitlines(), 1):
         match = re.match(r"^\s*(?:export\s+)?TYPESAFE_API_KEY\s*=(.*)$", line)
@@ -81,7 +101,7 @@ def main():
     parser.add_argument("--type", choices=("noul", "choice", "score"), default=None)
     parser.add_argument("--criteria", help="JSON choice options, score levels, or noul criteria")
     parser.add_argument("--model", help="Model override (default: jev-latest)")
-    parser.add_argument("--env-file", help="API key file (default: .env in the working directory; environment wins)")
+    parser.add_argument("--env-file", help="Exclusive API key file (default: search working-directory then installation ancestors; environment wins)")
     parser.add_argument("--dry-run", action="store_true", help="Print payload without calling API")
     args = parser.parse_args()
     try:

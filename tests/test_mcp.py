@@ -50,9 +50,9 @@ else:
         self.assertTrue(server.is_file(), 'MCP server entrypoint has not been implemented')
         image = os.environ.get('ASKJEV_TEST_IMAGE')
         env_file = self.directory / 'credentials.env'
-        if key is not None:
-            env_file.write_text('TYPESAFE_API_KEY=' + repr(key) + '\n')
-            env_file.chmod(0o644)  # synthetic credential, readable by container user
+        # An explicit empty file prevents tests from discovering real ancestor keys.
+        env_file.write_text('' if key is None else 'TYPESAFE_API_KEY=' + repr(key) + '\n')
+        env_file.chmod(0o644)  # synthetic credential, readable by container user
         if image:
             args = ['run', '--rm', '-i', '--network=none',
                     '--mount', f'type=bind,src={self.directory},dst=/run/askjev-test,readonly',
@@ -61,8 +61,7 @@ else:
                 args += ['-e', 'PATH=/run/askjev-test/bin:/usr/local/bin:/usr/bin:/bin',
                          '-e', 'EXPECTED_KEY=' + (environment_key or 'file-test-key')]
             args += [image]
-            if key is not None:
-                args += ['--env-file', '/run/askjev-test/credentials.env']
+            args += ['--env-file', '/run/askjev-test/credentials.env']
             parameters = StdioServerParameters(command='docker', args=args)
         else:
             env = dict(os.environ, TYPESAFE_API_KEY=environment_key)
@@ -70,8 +69,7 @@ else:
                 env['PATH'] = str(self.directory / 'bin') + os.pathsep + env['PATH']
                 env['EXPECTED_KEY'] = environment_key or 'file-test-key'
             args = [str(server)]
-            if key is not None:
-                args += ['--env-file', str(env_file)]
+            args += ['--env-file', str(env_file)]
             parameters = StdioServerParameters(command=sys.executable, args=args, env=env, cwd=self.directory)
         return Client(parameters, read_timeout_seconds=20)
 

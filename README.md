@@ -52,7 +52,7 @@ Configure `TYPESAFE_API_KEY` in the environment used by the agent, or put this i
 TYPESAFE_API_KEY='your-key-here'
 ```
 
-A nonempty environment variable wins over the file. To use a shared key file from any task directory, pass `--env-file /absolute/path/to/.env`. The CLI reads only `TYPESAFE_API_KEY`, without sourcing shell code or expanding variables. It supports single-line unquoted or quoted values, optional `export`, and comments. It does not search parent directories. Dry runs do not read key files.
+A nonempty environment variable wins over the file. To use a shared key file from any task directory, pass `--env-file /absolute/path/to/.env`. The CLI reads only `TYPESAFE_API_KEY`, without sourcing shell code or expanding variables. It supports single-line unquoted or quoted values, optional `export`, and comments. Without `--env-file`, it searches the working directory and each parent up to the filesystem root, then the resolved script directory and its parents. The first `.env` containing a nonempty key wins; repeated paths are checked once. A `.env` in your installed `askjev` skill directory therefore works from other task directories. An explicit `--env-file` disables searching, even if the selected file is missing or has no key. Malformed key entries or unreadable files fail rather than silently falling back. Dry runs do not read key files.
 
 Keep real key files out of Git and chat; this repository ignores `.env` and `.env.*`. AskJev reads the installed `typesafe-ai` skill or its public upstream instructions, then checks current TypeSafe documentation; a third skill does not need to be copied into this repository.
 
